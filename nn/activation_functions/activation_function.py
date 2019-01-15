@@ -1,6 +1,6 @@
 class ActivationFunction(object):
-    def activate(self, z: float):
+    def activate(self, z):
         raise NotImplementedError()
 
-    def derivative(self, z: float):
+    def derivative(self, z):
         raise NotImplementedError()

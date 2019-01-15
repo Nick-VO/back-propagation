@@ -6,5 +6,5 @@ class OptimizationStrategy(object):
     def learning_rate(self):
         return self.__learning_rate
 
-    def optimize(self, theta: float, delta: float):
+    def optimize(self, theta, delta):
         raise NotImplementedError()

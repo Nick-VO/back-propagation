@@ -2,5 +2,5 @@ from nn.optimization_strategies.optimization_strategy import OptimizationStrateg
 
 
 class GradientDescent(OptimizationStrategy):
-    def optimize(self, theta: float, delta: float):
+    def optimize(self, theta, delta):
         return self.learning_rate * delta

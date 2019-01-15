@@ -1,37 +1,28 @@
-from nn.cells.hidden_cell import HiddenCell
-from nn.cells.input_cell import InputCell
-from nn.cells.output_cell import OutputCell
+from nn.activation_functions.logistic import Logistic
+from nn.cost_functions.quadratic import QuadraticCost
 from nn.network import Network
 from nn.optimization_strategies.gradient_descent import GradientDescent
 
 if __name__ == '__main__':
-    inputs = [InputCell(), InputCell()]
-    outputs = [OutputCell()]
-
-    learning_rate = 1
+    learning_rate = 5
+    activation = Logistic()
+    cost = QuadraticCost()
     optimization = GradientDescent(learning_rate)
-    nn = Network(inputs, outputs, optimization)
+    nn = Network([2, 6, 1], activation, cost, optimization)
 
-    hidden1 = HiddenCell()
-    hidden2 = HiddenCell()
-
-    nn.add_connected_hidden(hidden1, inputs[0], outputs[0])
-    nn.add_connected_hidden(hidden2, inputs[0], outputs[0])
-    nn.add_connection(inputs[1], hidden1)
-    nn.add_connection(inputs[1], hidden2)
-
-    episodes = 100000
-    input_samples = [
-        [0.001, 0.001],
-        [0.001, 1],
-        [1, 0.001],
+    episodes = 10000
+    input_sample = [
+        [0, 0],
+        [0, 1],
+        [1, 0],
         [1, 1]
     ]
-    desired_outputs = [
-        [0.001],
-        [.5],
-        [.5],
-        [0.001],
+
+    output_sample = [
+        [0],
+        [1],
+        [1],
+        [0]
     ]
 
-    nn.run(episodes, input_samples, desired_outputs)
+    nn.run(episodes, input_sample, output_sample)

@@ -1,76 +1,110 @@
-from nn.cells.cell import Cell
-from nn.cells.input_cell import InputCell
-from nn.cells.output_cell import OutputCell
-from nn.connection import Connection
+from random import random
+
+import numpy as np
+
+from nn.activation_functions.activation_function import ActivationFunction
+from nn.cost_functions.cost_function import CostFunction
 from nn.optimization_strategies.optimization_strategy import OptimizationStrategy
 
 
 class Network(object):
-    def __init__(self, inputs: [InputCell], outputs: [OutputCell],
-                 optimization: OptimizationStrategy):
-        self.__inputs = inputs
-        self.__outputs = outputs
-        self.__hidden = []
-        self.__optimization = optimization
+    def __init__(self, topology: [[int]],
+                 activation_function: ActivationFunction,
+                 cost_function: CostFunction,
+                 optimization_strategy: OptimizationStrategy):
+        self.__num_layers = len(topology)
+        self.__topology = topology
+        self.__a = [np.zeros(l) for l in topology]
+        self.__z = [np.zeros(l) for l in topology]
+        self.__b = [np.ones(l) for l in topology]
+        self.__w = [np.array([[random() for k in range(topology[l - 1])] for j in range(layer)]) for l, layer in
+                    enumerate(topology[1:], 1)]
+        self.__delta = [np.zeros(layer) for l, layer in enumerate(self.__topology)]
+        self.__activation_function = activation_function
+        self.__cost_function = cost_function
+        self.__optimization_strategy = optimization_strategy
 
     @property
-    def inputs(self):
-        return self.__inputs
+    def a(self):
+        return self.__a
 
     @property
-    def outputs(self):
-        return self.__outputs
+    def z(self):
+        return self.__z
 
     @property
-    def hidden(self):
-        return self.__hidden
+    def b(self):
+        return self.__b
 
-    def add_connection(self, input_cell: Cell, output_cell: Cell):
-        if not (input_cell in self.inputs or input_cell in self.hidden):
-            raise ValueError('input cell not present in network')
-        if not (output_cell in self.outputs or output_cell in self.hidden):
-            raise ValueError('output cell not present in network')
+    @property
+    def w(self):
+        return self.__w
 
-        conn = Connection(input_cell, output_cell)
-        input_cell.outputs.append(conn)
-        output_cell.inputs.append(conn)
+    @property
+    def delta(self):
+        return self.__delta
 
-    def add_hidden(self, new_cell: Cell):
-        self.__hidden.append(new_cell)
+    @property
+    def sigma(self):
+        return self.__activation_function.activate
 
-    def add_connected_hidden(self, new_cell: Cell, input_cell: Cell, output_cell: Cell):
-        self.add_hidden(new_cell)
-        self.add_connection(input_cell, new_cell)
-        self.add_connection(new_cell, output_cell)
+    @property
+    def delta_sigma(self):
+        return self.__activation_function.derivative
 
-    def feedforward(self, inputs: [float]):
-        # set inputs and fire them
-        for ic, i in zip(self.inputs, inputs):
-            ic.activation = i
-            ic.fire()
+    @property
+    def C(self):
+        return self.__cost_function.calculate
 
-        return [o.activation for o in self.outputs]
+    @property
+    def delta_C(self):
+        return self.__cost_function.gradient
 
-    def backpropagate(self, desired_outputs):
-        # set desired outputs and improve the weights
-        for oc, o in zip(self.outputs, desired_outputs):
-            oc.desired_output = o
-            oc.improve(self.__optimization)
+    @property
+    def O(self):
+        return self.__optimization_strategy.optimize
 
-    def run(self, episodes: int, input_samples: [[float]], desired_outputs: [[float]]):
+    def run(self, episodes: int, inputs: [[float]], outputs: [[float]]):
         for n in range(episodes):
             print('\n\nEpisode ', n + 1)
-            for input_sample, output_sample in zip(input_samples, desired_outputs):
-                if len(self.inputs) != len(input_sample):
-                    raise ValueError('wrong amount of input values, expected ', len(self.inputs),
-                                     ' but got ', len(input_sample))
-                if len(self.outputs) != len(output_sample):
-                    raise ValueError('wrong amount of output values, expected ', len(self.outputs),
-                                     ' but got ', len(output_sample))
 
-                ff_output = self.feedforward(input_sample)
-                self.backpropagate(output_sample)
+            for i, o in zip(inputs, outputs):
+                self.feedforward(i)
+                self.backpropagate(o)
 
-                print('\nInputs:  ', input_sample)
-                print('Outputs: ', ff_output)
-                print('Desired: ', output_sample)
+                print('\nInputs:  ', i)
+                print('Outputs: ', self.a[-1])
+                print('Desired: ', o)
+
+    def feedforward(self, inputs: [float]):
+        for i, ic in enumerate(self.a[0]):
+            self.a[0][i] = inputs[i]
+
+        for l in range(1, self.__num_layers):
+            self.z[l] = (self.w[l - 1] @ self.a[l - 1]) + self.b[l]
+            self.a[l] = self.sigma(self.z[l])
+
+    def backpropagate(self, outputs: [float]):
+        # output layer cost
+        L = -1
+        self.delta[L] = self.delta_C(self.a[L], np.array(outputs).T) * self.delta_sigma(self.z[L])
+
+        # hidden layers
+        for l in range(2, self.__num_layers):
+            self.delta[-l] = (self.w[-l + 1].T @ self.delta[-l + 1]) * self.delta_sigma(self.z[-l])
+
+        # update weights and biases
+        for l in range(self.__num_layers - 1):
+            delta = self.delta[l + 1][np.newaxis]
+            self.w[l] -= self.O(self.w[l], self.a[l] * delta.T)
+            self.b[l] -= self.O(self.b[l], self.delta[l])
+
+        """
+        for l, wl in enumerate(self.w):
+            for j, wj in enumerate(wl):
+                for k, w in enumerate(wj):
+                    delta_w = self.a[l][k] * self.delta[l + 1][j]
+                    self.w[l][j][k] -= self.O(self.w[l][j][k], delta_w)
+                delta_b = self.delta[l + 1][j]
+                self.b[l] -= self.O(self.b[l], delta_b)
+        """
